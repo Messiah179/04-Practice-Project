@@ -1,0 +1,62 @@
+name: Lint, Test & Deploy 
+on: push
+jobs:
+ Lint:
+  runs-on: ubuntu-latest
+  steps:
+   - name: lint-checkout  
+     uses: actions/checkout@v4
+   - name: linter
+     uses: cschleiden/actions-linter@v1
+     with:
+      workflows: '[".github/workflows/*.yaml"]'
+ Test:
+   needs: Lint
+   runs-on: ubuntu-latest
+   steps:
+    - name: Get code
+      uses: actions/checkout@v7.0.0
+    - name: Install NodeJS
+      uses: actions/setup-node@v6
+      with:
+       node-version: 24 
+    - name: Install dependencies
+      run: npm ci
+    - name: Run tests
+      run: npm test  
+ Build:
+  needs: Test
+  runs-on: ubuntu-latest
+  steps:
+   - uses: actions/checkout@v7.0.0
+   - uses: actions/setup-go@v6
+     with:
+      go-version-file: "go.mod"
+   - name: Get Go cache paths
+     id: go-cache-paths
+     shell: bash
+     run: |
+      echo "go-build=$(go env GOCACHE)" >> $GITHUB_OUTPUT
+      echo "go-mod=$(go env GOMODCACHE)" >> $GITHUB_OUTPUT
+   - name: Go build cache
+     uses: actions/cache@v5
+     with:
+      path: ${{ steps.go-cache-paths.outputs.go-build }}
+      key: ${{ runner.os }}-release-go-build-${{ hashFiles('**/go.sum') }}
+   - name: Go mod cache
+     uses: actions/cache@v5
+     with:
+      path: ${{ steps.go-cache-paths.outputs.go-mod }}
+      key: ${{ runner.os }}-release-go-mod-${{ hashFiles('**/go.sum') }}
+   - run: make build
+
+   - name: Generate checksums
+     run: |
+          cd bin
+          sha256sum * > code-marketplace_${{ github.ref_name }}_checksums.txt
+   - uses: softprops/action-gh-release@v3
+     with:
+      draft: true
+      files: ./bin/*
+   
+

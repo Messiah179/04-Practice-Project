@@ -1,0 +1,6 @@
+name: output issue
+on: issues
+jobs:
+ output-lint:
+  runs-on: ubuntu-latest
+  output: ${{ steps.lint-checkout }}
